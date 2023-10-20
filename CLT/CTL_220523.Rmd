@@ -1,0 +1,90 @@
+---
+output: html_document
+runtime: shiny
+---
+
+```{css, echo = FALSE}
+.shiny-frame{height: 900px;}
+```  
+
+```{r, echo=FALSE, warning = FALSE, message=FALSE}
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(stats)
+
+ui <- fluidPage(
+  titlePanel("Central Limit Theorem"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("population_dist", "Population Distribution:",
+                  choices = c("Normal", "Uniform", "Exponential"),
+                  selected = "Normal"),
+      sliderInput("sample_size", "Sample Size:", min = 10, max = 30, value = 30),
+      sliderInput("repetitions", "Number of Repetitions:", min = 1, max = 1000, value = 100),
+    ),
+    mainPanel(
+      plotOutput("sample_means_plot", height = "300px"),
+      plotOutput("population_density_plot", height = "200px")
+    )
+  )
+)
+
+server <- function(input, output) {
+  sample_means <- reactive({
+    set.seed(123) #for reproducibility
+    population_dist <- switch(input$population_dist,
+                              "Normal" = rnorm,
+                              "Uniform" = runif,
+                              "Exponential" = rexp)
+    sample_size <- input$sample_size
+    repetitions <- input$repetitions
+    
+    # Generate sample means
+    replicate(repetitions, mean(population_dist(sample_size)))
+  })
+  
+  output$sample_means_plot <- renderPlot({
+    req(sample_means())
+    
+    density_data <- data.frame(x = sample_means())
+    
+    dist_name <- switch(input$population_dist,
+                        "Normal" = "Normal Distribution",
+                        "Uniform" = "Uniform Distribution",
+                        "Exponential" = "Exponential Distribution")
+    
+    ggplot(density_data, aes(x)) +
+      geom_histogram(color = "black", fill = "skyblue", bins = 30, aes(y = ..density..)) +
+      stat_function(fun = dnorm, args = list(mean = mean(sample_means()), sd = sd(sample_means())), color = "red", size = 1) +
+      labs(x = "Sample Mean", y = "Density", title = paste("Distribution of Sample Means of", dist_name)) +
+      guides(fill = guide_legend()) +
+      theme_minimal()+
+      theme(axis.text.y = element_blank())
+  })
+  
+  output$population_density_plot <- renderPlot({
+    population_dist <- switch(input$population_dist,
+                              "Normal" = rnorm,
+                              "Uniform" = runif,
+                              "Exponential" = rexp)
+    
+    x <- seq(min(population_dist(1000)), max(population_dist(1000)), length.out = 100)
+    y <- switch(input$population_dist,
+                "Normal" = dnorm(x),
+                "Uniform" = dunif(x),
+                "Exponential" = dexp(x))
+    
+    data <- data.frame(x = x, y = y)
+    
+    ggplot(data, aes(x, y)) +
+      geom_line(color = "blue", size = 1) +
+      labs(x = "Value", y = "Density", title = paste("Population Distribution:", input$population_dist)) +
+      theme_minimal()+
+      theme(axis.text.y = element_blank())
+  })
+}
+
+shinyApp(ui, server)
+```
+

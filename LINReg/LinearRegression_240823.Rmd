@@ -1,0 +1,107 @@
+---
+output: html_document
+runtime: shiny
+---
+
+
+```{css, echo = FALSE}
+.shiny-frame{height: 900;}
+```  
+
+```{r ,echo=FALSE, warning = FALSE, message=FALSE}
+# Load required libraries
+library(shiny)
+#library(datasets)  # For accessing built-in datasets if wanted
+# library(gridExtra)
+
+
+gen.data = function(...){
+  #man sieht die heteroscedasticty erst ab einem höheren Input
+
+  # dataset demonstrate heteroscedasticity
+  set.seed(123)  # For reproducibility
+  n <- 100
+  X <- seq(2.5, 50, length.out = n)
+  Y <- X + rnorm(n, mean = 0, sd = X * 0.2)  # Heteroscedastic errors
+  dataset_a <- data.frame(X, Y)
+
+
+  #dataset demonstrate homoscedasticity
+  set.seed(456)  # For reproducibility
+  n <- 100
+  X <- seq(2.5, 50, length.out = n)
+  Y <- X + rnorm(n, mean = 0, sd = 10)  # Homoscedastic errors
+  dataset_b<- data.frame(X, Y)
+  
+  list(dataset_a, dataset_b)
+}
+
+
+
+
+
+# Define the UI
+ui <- fluidPage(
+  titlePanel("Simple Linear Regression"),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("dataset_choice", "Choose a dataset:",
+                   choices = c("Dataset A", "Dataset B"), selected = "Dataset A"),
+      sliderInput("num_points", "Number of observations:", min = 2, max = 100, value = 10),
+      actionButton("run_regression", "Run Regression")
+    ),
+    mainPanel(
+      plotOutput("scatter_plot"),
+      div(style = "margin-top: 20px; margin-bottom: 20px;"),
+      verbatimTextOutput("reg_output"),
+      plotOutput("residuals_vs_fitted")
+    )
+  )
+)
+
+# Define the server
+server <- function(input, output) {
+  data = gen.data()
+  dataset_a = data[[1]]
+  dataset_b = data[[2]]
+  # Load the selected dataset
+  loaded_dataset <- reactive({
+    switch(input$dataset_choice,
+           "Dataset A" = dataset_a,
+           "Dataset B" = dataset_b)
+  })
+  
+  # Subset the loaded dataset based on selected number of observations
+  selected_data <- reactive({
+    head(loaded_dataset(), input$num_points)
+  })
+  
+  # Perform the linear regression and output results
+  output$reg_output <- renderPrint({
+    lm_result <- lm(selected_data()[[2]] ~ selected_data()[[1]], data = selected_data())
+    return(summary(lm_result))
+  })
+  
+  # Plot the scatterplot with regression line
+  output$scatter_plot <- renderPlot({
+    lm_result <- lm(selected_data()[[2]] ~ selected_data()[[1]], data = selected_data())
+    plot(selected_data()[[1]], selected_data()[[2]], main = "Scatterplot", 
+         xlab = "x", ylab = "y")
+    abline(lm_result, col = "red") # Add regression line
+  })
+  
+  # Plot residuals vs fitted values
+  output$residuals_vs_fitted <- renderPlot({
+    lm_result <- lm(selected_data()[[2]] ~ selected_data()[[1]], data = selected_data())
+    plot(fitted(lm_result), lm_result$residuals,
+         main = "Residuals vs Fitted",
+         xlab = "Fitted Values", ylab = "Residuals")
+    abline(h = 0, col = "red")
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui, server)
+```
+
+
