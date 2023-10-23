@@ -1,7 +1,7 @@
 ---
 output: html_document
 runtime: shiny
-title: Law of Large Numbers
+# title: Law of Large Numbers
 ---
 
 ```{css, echo = FALSE}
@@ -17,20 +17,27 @@ plot_law_of_large_numbers <- function(simulations, repetitions, distribution) {
   set.seed(42)  # Set a seed for reproducibility
   
   df <- data.frame()
-  
+
   for (i in 1:repetitions) {
+    data1 = rnorm(10000) # Generate random numbers from a normal
+    data2 = rbinom(10000,1,0.5) # Generate random numbers from a Bernoulli distribution
+    data3 = rt(10000, 5) # Generate random numbers from a t distribution
+    data4 = rt(10000, 1) # Generate random numbers from a t distribution
+    data5 = c(stats::filter(rnorm(10000),0.8,"recursive"))
+    data6 = cumsum(rnorm(10000))
+    
     if (distribution == "IID standard normal") {
-      data <- rnorm(simulations)  # Generate random numbers from a normal
-    } else if (distribution == "IID Student-t(5)") {
-      data <- rt(simulations, 5)  # Generate random numbers from a t distribution
-    } else if (distribution == "IID Bernoulli with p=0.25") {
-      data <- rbinom(simulations,1,0.25)  # Generate random numbers from a Bernoulli distribution
-    }
-    else if (distribution == "AR(1) with rho=0.8 and N(0,1) increments") {
-      data <- c(stats::filter(rnorm(simulations),0.8,"recursive"))
-    }
-    else if (distribution == "Random walk with N(0,1) increments") {
-      data <- cumsum(rnorm(simulations))
+      data <- data1[1:simulations]  
+    } else if (distribution == "Coin: IID Bernoulli, p=0.5") {
+      data <- data2[1:simulations]  
+    } else if (distribution == "IID Student-t(2)") {
+      data <- data3[1:simulations]  
+    } else if (distribution == "IID Student-t(1)") {
+      data <- data4[1:simulations]
+    } else if (distribution == "AR(1), phi=0.8, N(0,1) increments") {
+      data <- data5[1:simulations]
+    } else if (distribution == "Random walk, N(0,1) increments") {
+      data <- data6[1:simulations]  
     }
     
     average <- cumsum(data) / (1:simulations)  # Calculate the cumulative average
@@ -40,7 +47,7 @@ plot_law_of_large_numbers <- function(simulations, repetitions, distribution) {
     df <- rbind(df, temp_df)  # Append the temporary data frame to the main data frame
   }
   
-  actual_mean <- ifelse(distribution == "Dice", 3.5, ifelse(distribution == "Uniform", 0.5, 0))
+  actual_mean <- ifelse(distribution == "Coin: IID Bernoulli, p=0.5", 0.5, 0)
   
   ggplot(df, aes(x = Simulations, y = Average, color = Repetition)) +
     geom_line(size = 0.5) +
@@ -57,10 +64,16 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("distribution", "Distribution:",
-                  choices = c("IID standard normal", "IID Student-t(5)", "IID Bernoulli with p=0.25", "AR(1) with rho=0.8 and N(0,1) increments", "Random walk with N(0,1) increments"), selected = "IID standard normal"),
+                  choices = c("IID standard normal", 
+                              "Coin: IID Bernoulli, p=0.5", 
+                              "IID Student-t(2)", 
+                              "IID Student-t(1)",
+                              "AR(1), phi=0.8, N(0,1) increments", 
+                              "Random walk, N(0,1) increments"
+                              ), selected = "IID standard normal"),
       shinyWidgets::sliderTextInput("simulations","Sample size:",
                             choices=c(seq(1,5,1),seq(10,100,10), seq(200,1000,100), seq(2000,10000, 1000)),
-                            selected=100, grid = T),
+                            selected=50, grid = T),
       sliderInput("repetitions", "Number of Repetitions:", min = 1, max = 10, value = 5)
     ),
     
