@@ -1,0 +1,74 @@
+---
+output: html_document
+runtime: shiny
+title: Law of Large Numbers
+---
+
+```{css, echo = FALSE}
+.shiny-frame{height: 810px;}
+```  
+
+
+```{r, echo=FALSE, warning = FALSE}
+# Load libraries
+library(shiny)
+library(ggplot2)
+plot_law_of_large_numbers <- function(simulations, repetitions, distribution) {
+  set.seed(42)  # Set a seed for reproducibility
+  
+  df <- data.frame()
+  
+  names = c("IID standard normal", "IID Student-t(5)", "IID Bernoulli with p=0.25", "AR(1) with rho=0.8 and N(0,1) increments", "Random walk with N(0,1) increments")
+  
+  for (i in 1:repetitions) {
+    if (distribution == "IID standard normal") {
+      data <- sample(1:6, simulations, replace = TRUE)  # Simulate drawing from a fair 6-sided die
+    } else if (distribution == "IID Student-t(5)") {
+      data <- rnorm(simulations)  # Generate random numbers from a normal distribution
+    } else if (distribution == "IID Bernoulli with p=0.25") {
+      data <- runif(simulations)  # Generate random numbers from a uniform distribution
+    }
+    
+    average <- cumsum(data) / (1:simulations)  # Calculate the cumulative average
+    
+    temp_df <- data.frame(Simulations = 1:simulations, Average = average, Repetition = factor(i))  # Create a temporary data frame
+    
+    df <- rbind(df, temp_df)  # Append the temporary data frame to the main data frame
+  }
+  
+  actual_mean <- ifelse(distribution == "Dice", 3.5, ifelse(distribution == "Uniform", 0.5, 0))
+  
+  ggplot(df, aes(x = Simulations, y = Average, color = Repetition)) +
+    geom_line(size = 0.5) +
+    geom_hline(yintercept = actual_mean, color = "black", linetype = "dashed") +
+    labs(x = "Number of Simulations", y = "Average",
+         title = paste("Law of Large Numbers for", distribution, "Distribution")) +
+    scale_color_discrete(name = "Repetition")+
+    theme_minimal()
+}
+
+ui <- fluidPage(
+  titlePanel("Law of Large Numbers"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("distribution", "Distribution:",
+                  choices = c("IID standard normal", "IID Student-t(5)", "IID Bernoulli with p=0.25"), selected = "IID standard normal"),
+      sliderInput("simulations", "Number of Simulations:", min = 1, max = 1000, value = 1000),
+      sliderInput("repetitions", "Number of Repetitions:", min = 1, max = 10, value = 5)
+    ),
+    
+    mainPanel(
+      plotOutput("plot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$plot <- renderPlot({
+    plot_law_of_large_numbers(input$simulations, input$repetitions, input$distribution)
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
