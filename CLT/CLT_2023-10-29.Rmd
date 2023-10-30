@@ -18,19 +18,19 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("population_dist", "Population Distribution:",
-                  choices = c("Normal", "Uniform", "Exponential"),
+                  choices = c("Normal", "Uniform", "Exponential", "Student-t(3)"),
                   selected = "Normal"),
       shinyWidgets::sliderTextInput(
         "sample_size",
         "Sample size:",
-        choices=c(seq(1,5,1),seq(10,100,10), seq(200,1000,100), seq(2000,10000, 1000)),
+        choices=c(1:10,c(25,50,100), 500,1000,5000,10000),
         selected=50, 
         grid = T),
       shinyWidgets::sliderTextInput(
         "repetitions",
         "Number of Repetitions:",
-        choices=c(10, 100, 1000, 10000),
-        selected=100, 
+        choices=c(10, 100, 1000, 10000, 50000, 100000),
+        selected=10000, 
         grid = T),
       # sliderInput("sample_size", "Sample Size:", min = 10, max = 30, value = 30),
       # sliderInput("repetitions", "Number of Repetitions:", min = 1, max = 1000, value = 100),
@@ -49,11 +49,15 @@ server <- function(input, output) {
     rnorm1 = function(n) rnorm(n)
     runif1 = function(n) sqrt(12)*(runif(n)-0.5)
     rexp1 = function(n) rexp(n)-1
+    rt1 = function(n) rt(n,3)*sqrt(3-2)/sqrt(3)
+    rber1 = function(n) sqrt(0.5^2)*(rbinom(n,1,0.5)-0.5)
+    rpois1 = function(n) sqrt(3)*(rpois(n,3)-3)
     
     population_dist <- switch(input$population_dist,
                               "Normal" = rnorm1,
                               "Uniform" = runif1,
-                              "Exponential" = rexp1)
+                              "Exponential" = rexp1,
+                              "Student-t(3)" = rt1)
     sample_size <- input$sample_size
     repetitions <- input$repetitions
     
@@ -71,33 +75,45 @@ server <- function(input, output) {
     density_data <- data.frame(x = sample_means())
     
     dist_name <- switch(input$population_dist,
-                        "Normal" = "Normal Distribution",
-                        "Uniform" = "Uniform Distribution",
-                        "Exponential" = "Exponential Distribution")
+                        "Normal" = "Normal Distribution N(0,1)",
+                        "Uniform" = "Uniform Distribution U[0,1]",
+                        "Exponential" = "Exponential Distribution (lambda=1)",
+                        "Student-t(3)" = "Student-t Distribution (3 df)")
     
     ggplot(density_data, aes(x)) +
-      geom_histogram(color = "black", fill = "skyblue", bins = 30, aes(y = ..density..)) +
+      # geom_histogram(color = "black", fill = "skyblue", bins = 30, aes(y = ..density..)) +
+      geom_histogram(color = "black", fill = "skyblue", binwidth = .1, size=.1, aes(y = after_stat(density))) +
       # geom_histogram(aes(fill=class), binwidth = .1, col="black", size=.1) +
-      # geom_histogram(aes(y = ..density..), binwidth = .1, size=.1) +
+      # geom_histogram(aes(y = ..density..), binwidth = .1, size=.1, fill = "skyblue", color = "black") +
       # stat_function(fun = dnorm, args = list(mean = mean(sample_means()), sd = sd(sample_means())), color = "red", size = 1) +
       stat_function(fun = dnorm, color = "red", size = 1) +
-      labs(x = "Sample Mean", y = "Density", title = paste("Distribution of Sample Means of", dist_name)) +
+      labs(x = "Sample Mean", y = "Density", title = paste("Distribution of standardized Sample Means:", dist_name)) +
       guides(fill = guide_legend()) +
-      theme_minimal()+
-      theme(axis.text.y = element_blank())
+      theme_minimal() 
+    # +
+    #   theme(axis.text.y = element_blank())
   })
   
   output$population_density_plot <- renderPlot({
-    population_dist <- switch(input$population_dist,
-                              "Normal" = rnorm,
-                              "Uniform" = runif,
-                              "Exponential" = rexp)
+    qt1 = function(p) qt(p, 3)
+    qber1 = function(p) qbinom(p, 1, 0.5)
+    qpois1 = function(p) qpois(p, 3)
+    population_quant <- switch(input$population_dist,
+                              "Normal" = qnorm,
+                              "Uniform" = qunif,
+                              "Exponential" = qexp,
+                              "Student-t(3)" = qt1,
+                              "Bernoulli" = qber1,
+                              "Poisson" = qpois1)
     
-    x <- seq(min(population_dist(1000)), max(population_dist(1000)), length.out = 100)
+    x <- seq(population_quant(0.005)-0.02, population_quant(0.995)+0.02, length.out = 1000)
     y <- switch(input$population_dist,
                 "Normal" = dnorm(x),
                 "Uniform" = dunif(x),
-                "Exponential" = dexp(x))
+                "Exponential" = dexp(x),
+                "Student-t(3)" = dt(x,3),
+                "Bernoulli" = dbinom(c(0,1),1,0.5),
+                "Poisson" = dpois(x,1))
     
     data <- data.frame(x = x, y = y)
     
